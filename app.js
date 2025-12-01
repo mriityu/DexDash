@@ -119,7 +119,10 @@ async function fetchTokenData() {
 
         currentPairs.forEach(pair => {
             const addr = pair.baseToken.address;
-            const liq = pair.liquidity && pair.liquidity.usd ? pair.liquidity.usd : 0;
+            
+            // FIX: Check if liquidity object exists before accessing .usd
+            // Some pairs returned by API have no liquidity data, causing the crash.
+            const liq = (pair.liquidity && pair.liquidity.usd) ? pair.liquidity.usd : 0;
 
             // Initialize if new token
             if (!uniqueTokens[addr]) {
@@ -211,8 +214,13 @@ function loadTokenByAddress(address) {
     // Find all pairs that belong to this specific address
     const pairsForThisToken = currentPairs.filter(p => p.baseToken.address === address);
     
-    // Sort by liquidity to find the main pair (e.g. exclude low liq pairs)
-    const bestPair = pairsForThisToken.sort((a, b) => b.liquidity.usd - a.liquidity.usd)[0];
+    // Sort by liquidity to find the main pair
+    // FIX: Added safety check for liquidity.usd here to prevent sorting crash
+    const bestPair = pairsForThisToken.sort((a, b) => {
+        const liqA = (a.liquidity && a.liquidity.usd) ? a.liquidity.usd : 0;
+        const liqB = (b.liquidity && b.liquidity.usd) ? b.liquidity.usd : 0;
+        return liqB - liqA;
+    })[0];
     
     updateUI(bestPair);
 
@@ -224,8 +232,8 @@ function loadTokenByAddress(address) {
 
 function updateUI(pair) {
     // Header Info
-    document.getElementById('tokenName').innerText = pair.baseToken.name || "Unknown";
-    document.getElementById('tokenSymbol').innerText = pair.baseToken.symbol || "UNK";
+    document.getElementById('tokenName').innerText = pair.baseToken.name;
+    document.getElementById('tokenSymbol').innerText = pair.baseToken.symbol;
     
     // Image Logic
     const imgUrl = pair.info && pair.info.imageUrl ? pair.info.imageUrl : 'https://cdn-icons-png.flaticon.com/512/12114/12114233.png';
@@ -236,30 +244,33 @@ function updateUI(pair) {
     document.getElementById('tokenPrice').innerText = price < 0.01 ? `$${price.toFixed(8)}` : `$${price.toFixed(2)}`;
     
     // 24h Change
-    const change = pair.priceChange?.h24;
+    const change = pair.priceChange.h24;
     const changeEl = document.getElementById('priceChange');
     changeEl.innerText = `${change > 0 ? '+' : ''}${change.toFixed(2)}%`;
     changeEl.className = `text-sm font-medium mb-1 ${change >= 0 ? 'text-green-400' : 'text-red-400'}`;
 
     // Liquidity & Volume
-    document.getElementById('tokenLiquidity').innerText = formatCurrency(pair.liquidity.usd);
+    // FIX: Check if liquidity exists
+    const liqUsd = (pair.liquidity && pair.liquidity.usd) ? pair.liquidity.usd : 0;
+    
+    document.getElementById('tokenLiquidity').innerText = formatCurrency(liqUsd);
     document.getElementById('tokenFdv').innerText = formatCurrency(pair.fdv);
     document.getElementById('tokenVolume').innerText = formatCurrency(pair.volume.h24);
     document.getElementById('txCount').innerText = (pair.txns.h24.buys + pair.txns.h24.sells).toLocaleString();
 
     // Pair Info Sidebar
-    document.getElementById('pairDex').innerText = pair.dexId ? pair.dexId.toUpperCase() : "N/A";
-    document.getElementById('pairChain').innerText = pair.chainId || "N/A";
-    document.getElementById('pairAddress').innerText = pair.pairAddress || "N/A";
+    document.getElementById('pairDex').innerText = pair.dexId.toUpperCase();
+    document.getElementById('pairChain').innerText = pair.chainId;
+    document.getElementById('pairAddress').innerText = pair.pairAddress;
     document.getElementById('baseToken').innerText = pair.baseToken.symbol;
     document.getElementById('quoteToken').innerText = pair.quoteToken.symbol;
     document.getElementById('dexLink').href = pair.url;
 
     // Price Changes List
-    setColorAndText('change5m', pair.priceChange?.m5);
-    setColorAndText('change1h', pair.priceChange?.h1);
-    setColorAndText('change6h', pair.priceChange?.h6);
-    setColorAndText('change24h', pair.priceChange?.h24);
+    setColorAndText('change5m', pair.priceChange.m5);
+    setColorAndText('change1h', pair.priceChange.h1);
+    setColorAndText('change6h', pair.priceChange.h6);
+    setColorAndText('change24h', pair.priceChange.h24);
 
     // Update Chart Iframe
     const chartUrl = `https://dexscreener.com/${pair.chainId}/${pair.pairAddress}?embed=1&loadChartSettings=0&trades=0&tabs=0&info=0&chartLeftToolbar=0&chartDefaultOnMobile=1&chartTheme=dark&theme=dark&chartStyle=0&chartType=usd&interval=15`;
