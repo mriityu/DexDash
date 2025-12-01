@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Crypto Price Dashboard</title>
+    <title>DexDash | Crypto Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script>
@@ -60,7 +60,7 @@
             }
         }
 
-        /* Suggestion Dropdown Styles */
+        /* Suggestions Dropdown */
         .suggestions-box {
             position: absolute;
             top: 100%;
@@ -117,6 +117,43 @@
             left: 0;
             border: 0;
         }
+
+        /* PRINT STYLES */
+        @media print {
+            body {
+                background: white;
+                color: black;
+            }
+
+            nav,
+            .no-print,
+            #tokenModal {
+                display: none !important;
+            }
+
+            #dashboard {
+                display: block !important;
+            }
+
+            .bg-gray-800,
+            .bg-gray-900 {
+                background: white !important;
+                border: 1px solid #ddd !important;
+            }
+
+            .text-gray-400 {
+                color: #666 !important;
+            }
+
+            .text-white {
+                color: black !important;
+            }
+
+            #dexscreener-embed {
+                height: 400px;
+                border: 1px solid #ccc;
+            }
+        }
     </style>
 </head>
 
@@ -127,7 +164,7 @@
         <div class="container mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
             <!-- Logo with Reload Logic -->
             <div class="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
-                onclick="window.location.reload()">
+                onclick="resetApp()">
                 <i class="fa-solid fa-chart-line text-blue-500 text-xl"></i>
                 <h1 class="text-xl font-bold tracking-tight">DexDash</h1>
             </div>
@@ -149,7 +186,7 @@
                 </div>
 
                 <button onclick="fetchTokenData()"
-                    class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 whitespace-nowrap">
+                    class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium flex items-center gap-2 whitespace-nowrap">
                     <span id="btnText">Load</span>
                     <div id="btnLoader" class="loader hidden"></div>
                 </button>
@@ -181,135 +218,147 @@
         <!-- Dashboard Content -->
         <div id="dashboard" class="hidden flex flex-col gap-6">
 
-            <!-- Top Stats Cards -->
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 flex items-center gap-4">
-                    <img id="tokenImage" src="" alt="Token" class="w-12 h-12 rounded-full bg-gray-700 object-cover">
-                    <div class="overflow-hidden">
-                        <h2 id="tokenName" class="font-bold text-lg truncate">Token Name</h2>
-                        <p id="tokenSymbol" class="text-gray-400 text-sm">SYMB</p>
+            <div class="flex flex-wrap justify-between items-center gap-4 no-print">
+                <div class="flex items-center gap-3">
+                    <img id="tokenImage" src="" class="w-10 h-10 rounded-full border border-gray-600">
+                    <div>
+                        <h2 id="tokenName" class="font-bold text-xl leading-none">Token</h2>
+                        <span id="tokenSymbol" class="text-gray-400 text-sm">SYMB</span>
                     </div>
                 </div>
+                <div class="flex gap-2">
+                    <button onclick="exportData('json')"
+                        class="bg-gray-800 border border-gray-700 hover:bg-gray-700 text-sm px-3 py-1.5 rounded-lg flex items-center gap-2 transition-colors">
+                        <i class="fa-solid fa-file-code text-yellow-500"></i> Export JSON
+                    </button>
+                    <button onclick="exportData('csv')"
+                        class="bg-gray-800 border border-gray-700 hover:bg-gray-700 text-sm px-3 py-1.5 rounded-lg flex items-center gap-2 transition-colors">
+                        <i class="fa-solid fa-file-csv text-green-500"></i> Export CSV
+                    </button>
+                    <button onclick="window.print()"
+                        class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-1.5 rounded-lg flex items-center gap-2 transition-colors">
+                        <i class="fa-solid fa-print"></i> Print / Save Chart
+                    </button>
+                </div>
+            </div>
 
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div class="bg-gray-800 p-4 rounded-xl border border-gray-700">
-                    <p class="text-gray-400 text-xs uppercase font-semibold">Price USD</p>
-                    <div class="flex items-end gap-2 mt-1">
-                        <h3 id="tokenPrice" class="text-2xl font-bold text-white">$0.00</h3>
-                        <span id="priceChange" class="text-sm font-medium mb-1">+0.00%</span>
+                    <p class="text-gray-500 text-xs uppercase font-bold">Price USD</p>
+                    <div class="flex items-baseline gap-2 mt-1">
+                        <span id="tokenPrice" class="text-2xl font-bold text-white">$0.00</span>
+                        <span id="priceChange" class="text-sm font-bold">+0.00%</span>
                     </div>
                 </div>
-
                 <div class="bg-gray-800 p-4 rounded-xl border border-gray-700">
-                    <p class="text-gray-400 text-xs uppercase font-semibold">Liquidity</p>
+                    <p class="text-gray-500 text-xs uppercase font-bold">Liquidity</p>
                     <div class="mt-1">
-                        <h3 id="tokenLiquidity" class="text-2xl font-bold text-white">$0.00</h3>
-                        <p class="text-xs text-gray-500 mt-1">FDV: <span id="tokenFdv">$0</span></p>
+                        <span id="tokenLiquidity" class="text-2xl font-mono text-white">$0.00</span>
                     </div>
                 </div>
-
                 <div class="bg-gray-800 p-4 rounded-xl border border-gray-700">
-                    <p class="text-gray-400 text-xs uppercase font-semibold">24h Volume</p>
+                    <p class="text-gray-500 text-xs uppercase font-bold">Volume (24h)</p>
                     <div class="mt-1">
-                        <h3 id="tokenVolume" class="text-2xl font-bold text-white">$0.00</h3>
-                        <p class="text-xs text-gray-500 mt-1"><span id="txCount">0</span> txns</p>
+                        <span id="tokenVolume" class="text-2xl font-mono text-white">$0.00</span>
+                    </div>
+                </div>
+                <div class="bg-gray-800 p-4 rounded-xl border border-gray-700">
+                    <p class="text-gray-500 text-xs uppercase font-bold">Transactions (24h)</p>
+                    <div class="mt-1 flex justify-between items-end">
+                        <span id="txCount" class="text-2xl font-mono text-white">0</span>
+                        <div class="text-xs text-gray-400">
+                            <span class="text-green-400" id="buysCount">0</span> Buy / <span class="text-red-400"
+                                id="sellsCount">0</span> Sell
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Main Layout (Responsive Height) -->
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+            <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+                <div class="p-4 border-b border-gray-700 bg-gray-800/50">
+                    <h3 class="font-bold text-white"><i class="fa-solid fa-table mr-2 text-blue-500"></i>Market Analysis
+                        Data</h3>
+                </div>
+                <div
+                    class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-gray-700">
 
-                <!-- Chart (Takes up 2/3 on large screens) -->
-                <div class="lg:col-span-2 bg-gray-800 rounded-xl border border-gray-700 overflow-hidden flex flex-col">
-                    <div class="p-3 border-b border-gray-700 flex justify-between items-center bg-gray-800">
-                        <span class="font-semibold text-sm text-gray-300"><i
-                                class="fa-solid fa-chart-candlestick mr-2"></i>Live Chart</span>
-                        <div class="flex gap-2">
-                            <a id="dexLink" href="#" target="_blank"
-                                class="text-xs bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded transition-colors">
-                                View on DexScreener <i class="fa-solid fa-external-link-alt ml-1"></i>
-                            </a>
+                    <div class="p-4 space-y-3">
+                        <div class="flex justify-between"><span class="text-gray-400 text-sm">FDV</span> <span
+                                id="valFdv" class="font-mono text-white">-</span></div>
+                        <div class="flex justify-between"><span class="text-gray-400 text-sm">Market Cap</span> <span
+                                id="valMcap" class="font-mono text-white">-</span></div>
+                        <div class="flex justify-between"><span class="text-gray-400 text-sm">Pair Created</span> <span
+                                id="valAge" class="font-mono text-white">-</span></div>
+                        <div class="flex justify-between"><span class="text-gray-400 text-sm">Chain / Dex</span> <span
+                                class="text-white"><span id="valChain" class="capitalize">-</span> / <span id="valDex"
+                                    class="uppercase text-blue-400">-</span></span></div>
+                        <div class="mt-2">
+                            <span class="text-xs text-gray-500">Pair Address</span>
+                            <div class="bg-gray-900 p-1.5 rounded border border-gray-700 flex justify-between items-center cursor-pointer hover:border-blue-500 group mt-1"
+                                onclick="copyAddress()">
+                                <span id="valAddress"
+                                    class="text-xs font-mono text-gray-300 truncate w-32">0x00...</span>
+                                <i class="fa-regular fa-copy text-xs text-gray-500 group-hover:text-blue-400"></i>
+                            </div>
                         </div>
                     </div>
-                    <!-- Responsive Embed Container -->
-                    <div id="dexscreener-embed">
-                        <iframe id="chartFrame" src="about:blank" title="DexScreener Chart"></iframe>
+
+                    <div class="p-4 lg:col-span-2">
+                        <div class="text-xs text-gray-500 uppercase font-bold mb-3">Momentum (Price Change)</div>
+                        <div class="grid grid-cols-3 gap-4">
+                            <div class="bg-gray-900/50 p-2 rounded border border-gray-700/50 text-center">
+                                <div class="text-xs text-gray-400 mb-1">1m</div>
+                                <div id="chg1m" class="font-mono font-bold">-</div>
+                            </div>
+                            <div class="bg-gray-900/50 p-2 rounded border border-gray-700/50 text-center">
+                                <div class="text-xs text-gray-400 mb-1">5m</div>
+                                <div id="chg5m" class="font-mono font-bold">-</div>
+                            </div>
+                            <div class="bg-gray-900/50 p-2 rounded border border-gray-700/50 text-center">
+                                <div class="text-xs text-gray-400 mb-1">15m</div>
+                                <div id="chg15m" class="font-mono font-bold">-</div>
+                            </div>
+                            <div class="bg-gray-900/50 p-2 rounded border border-gray-700/50 text-center">
+                                <div class="text-xs text-gray-400 mb-1">1h</div>
+                                <div id="chg1h" class="font-mono font-bold">-</div>
+                            </div>
+                            <div class="bg-gray-900/50 p-2 rounded border border-gray-700/50 text-center">
+                                <div class="text-xs text-gray-400 mb-1">6h</div>
+                                <div id="chg6h" class="font-mono font-bold">-</div>
+                            </div>
+                            <div class="bg-gray-900/50 p-2 rounded border border-gray-700/50 text-center">
+                                <div class="text-xs text-gray-400 mb-1">24h</div>
+                                <div id="chg24h" class="font-mono font-bold">-</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
+            </div>
 
-                <!-- Sidebar Details (Takes up 1/3) -->
-                <div
-                    class="bg-gray-800 rounded-xl border border-gray-700 p-6 overflow-y-auto max-h-[600px] lg:max-h-full">
-                    <h3 class="font-bold text-lg mb-4 text-white">Pair Info</h3>
-                    <div class="space-y-4">
-                        <div class="flex justify-between items-center border-b border-gray-700 pb-2">
-                            <span class="text-gray-400 text-sm">DEX</span>
-                            <span id="pairDex" class="font-medium text-blue-400">Unknown</span>
-                        </div>
-                        <div class="flex justify-between items-center border-b border-gray-700 pb-2">
-                            <span class="text-gray-400 text-sm">Chain</span>
-                            <span id="pairChain" class="font-medium capitalize">Unknown</span>
-                        </div>
-                        <div class="flex justify-between items-center border-b border-gray-700 pb-2">
-                            <span class="text-gray-400 text-sm">Pair Address</span>
-                            <span id="pairAddress"
-                                class="font-mono text-xs text-gray-500 cursor-pointer hover:text-white truncate max-w-[150px]"
-                                onclick="copyToClipboard(this.innerText)">0x00...000</span>
-                        </div>
-                        <div class="flex justify-between items-center border-b border-gray-700 pb-2">
-                            <span class="text-gray-400 text-sm">Base Token</span>
-                            <span id="baseToken" class="font-medium">Unknown</span>
-                        </div>
-                        <div class="flex justify-between items-center border-b border-gray-700 pb-2">
-                            <span class="text-gray-400 text-sm">Quote Token</span>
-                            <span id="quoteToken" class="font-medium">Unknown</span>
-                        </div>
-                    </div>
-
-                    <h3 class="font-bold text-lg mb-4 mt-8 text-white">Price Change</h3>
-                    <div class="space-y-3">
-                        <div class="flex justify-between items-center"><span
-                                class="text-gray-400 text-sm">5m</span><span id="change5m"
-                                class="font-mono font-bold">0.00%</span></div>
-                        <div class="flex justify-between items-center"><span
-                                class="text-gray-400 text-sm">1h</span><span id="change1h"
-                                class="font-mono font-bold">0.00%</span></div>
-                        <div class="flex justify-between items-center"><span
-                                class="text-gray-400 text-sm">6h</span><span id="change6h"
-                                class="font-mono font-bold">0.00%</span></div>
-                        <div class="flex justify-between items-center"><span
-                                class="text-gray-400 text-sm">24h</span><span id="change24h"
-                                class="font-mono font-bold">0.00%</span></div>
-                    </div>
-
-                    <div class="mt-8 p-4 bg-gray-700/30 rounded-lg text-xs text-gray-400 text-center">
-                        Data provided by DexScreener API
-                    </div>
+            <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden flex flex-col">
+                <div class="p-3 border-b border-gray-700 flex justify-between items-center bg-gray-800/50">
+                    <span class="font-semibold text-sm text-gray-300"><i
+                            class="fa-solid fa-chart-candlestick mr-2"></i>Live Chart</span>
+                    <a id="dexLink" href="#" target="_blank" class="text-xs text-blue-400 hover:text-blue-300">Open on
+                        DexScreener <i class="fa-solid fa-external-link-alt"></i></a>
+                </div>
+                <div id="dexscreener-embed">
+                    <iframe id="chartFrame" src="about:blank" title="DexScreener Chart"></iframe>
                 </div>
             </div>
         </div>
     </main>
 
-    <!-- Token Selection Modal -->
     <div id="tokenModal"
         class="fixed inset-0 bg-black/80 hidden flex items-center justify-center z-[60] backdrop-blur-sm">
-        <div
-            class="bg-gray-800 rounded-xl border border-gray-700 p-6 max-w-md w-full mx-4 shadow-2xl transform transition-all">
-            <!-- Header & Close Button -->
+        <div class="bg-gray-800 rounded-xl border border-gray-700 p-6 max-w-md w-full mx-4 shadow-2xl">
             <div class="flex justify-between items-center mb-4">
-                <h3 class="text-xl font-bold text-white">Select a Token</h3>
-                <button onclick="closeModal()" class="text-gray-400 hover:text-white">
-                    <i class="fa-solid fa-times"></i>
-                </button>
+                <h3 class="text-xl font-bold text-white">Select Pair</h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-white"><i
+                        class="fa-solid fa-times"></i></button>
             </div>
-
-            <!-- Instruction Text -->
-            <p class="text-sm text-gray-400 mb-4">Multiple tokens found with this name. Please choose one:</p>
-
-            <!-- List Container (JavaScript fills this) -->
-            <div id="tokenList" class="space-y-2 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
-                <!-- Javascript will populate list items here -->
-            </div>
+            <p class="text-sm text-gray-400 mb-4">Multiple liquidity pools found. Select the most active one:</p>
+            <div id="tokenList" class="space-y-2 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar"></div>
         </div>
     </div>
 
@@ -339,9 +388,6 @@
 
     <!-- 2. Load App Logic Second -->
     <script src="app.js"></script>
-</body>
-
-</html>
 </body>
 
 </html>
