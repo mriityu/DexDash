@@ -2,7 +2,7 @@
 
 A lightweight, serverless crypto dashboard that tracks real-time token prices and charts using the DexScreener API.
 
-<a href="https://dex-dash-theta.vercel.app/" target="_blank">
+<a href="https://dex-dash-live.vercel.app/" target="_blank">
   <img src="https://img.shields.io/badge/🚀_Live_Demo-Start_Here-3b82f6?style=for-the-badge&logo=github&logoColor=white" alt="Live Demo" height="40" />
 </a>
 
