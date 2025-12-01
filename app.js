@@ -1,5 +1,13 @@
-// App
+/* * =========================================
+ * App
+ * =========================================
+ */
+
+// --- Variables ---
+let currentPairs = []; // Store raw data to use in modal selection
+
 // --- Autocomplete Logic ---
+
 function handleInput(value) {
     const suggestionsBox = document.getElementById('suggestions');
     if (!value) {
@@ -52,7 +60,11 @@ function clearSearch() {
     closeSuggestions();
 }
 
-// --- Main App Logic ---
+function closeModal() {
+    document.getElementById('tokenModal').classList.add('hidden');
+}
+
+// --- Core Logic ---
 
 async function fetchTokenData() {
     const input = document.getElementById('tokenInput');
@@ -95,24 +107,57 @@ async function fetchTokenData() {
             throw new Error("No pairs found. Try searching by contract address.");
         }
 
-        // Get pairs
-        const pairs = data.pairs;
+        // Store pairs globally for sorting/selecting logic
+        currentPairs = data.pairs;
 
-        // CRITICAL FIX: Sort safely. 
-        // The search endpoint sometimes returns pairs without liquidity data, which crashed the previous code.
-        const pair = pairs.sort((a, b) => {
-            const liqA = a.liquidity && a.liquidity.usd ? a.liquidity.usd : 0;
-            const liqB = b.liquidity && b.liquidity.usd ? b.liquidity.usd : 0;
-            return liqB - liqA;
-        })[0];
-
-        if (!pair) throw new Error("No valid liquid pairs found.");
-
-        updateUI(pair);
+        // --- SELECTION MODEL LOGIC ---
         
-        welcomeState.classList.add('hidden');
-        dashboard.classList.remove('hidden');
+        // 1. Group pairs by unique Token Address
+        // DexScreener returns multiple pairs for the SAME token (e.g. SOL/USDC, SOL/USDT).
+        // We want to count how many DISTINCT tokens we found (e.g. PIKACHU on Sol, PIKACHU on Base).
+        const uniqueTokens = {};
 
+        currentPairs.forEach(pair => {
+            const addr = pair.baseToken.address;
+            const liq = pair.liquidity && pair.liquidity.usd ? pair.liquidity.usd : 0;
+
+            // Initialize if new token
+            if (!uniqueTokens[addr]) {
+                uniqueTokens[addr] = {
+                    baseToken: pair.baseToken,
+                    quoteToken: pair.quoteToken,
+                    chainId: pair.chainId,
+                    maxLiquidity: 0,
+                    pairs: [] // Store all pairs for this token
+                };
+            }
+
+            // Update stats
+            uniqueTokens[addr].pairs.push(pair);
+            if (liq > uniqueTokens[addr].maxLiquidity) {
+                uniqueTokens[addr].maxLiquidity = liq;
+            }
+        });
+
+        // 2. Filter out "Dust" (tokens with < $100 liquidity) to avoid spam
+        // But if it's a direct address search, keep everything.
+        let validTokens = Object.values(uniqueTokens);
+        
+        if (!isAddress) {
+            validTokens = validTokens.filter(t => t.maxLiquidity > 100);
+        }
+
+        // 3. Decision Time
+        if (validTokens.length === 0) {
+            throw new Error("No tokens found with sufficient liquidity.");
+        } else if (validTokens.length === 1) {
+            // Only one valid token found -> Load it immediately
+            loadTokenByAddress(validTokens[0].baseToken.address);
+        } else {
+            // Multiple tokens found -> Show Selection Modal
+            showSelectionModal(validTokens);
+        }
+        
     } catch (err) {
         console.error(err);
         welcomeState.classList.add('hidden');
@@ -124,6 +169,57 @@ async function fetchTokenData() {
         btnText.classList.remove('hidden');
         btnLoader.classList.add('hidden');
     }
+}
+
+// Show the modal populated with the distinct tokens found
+function showSelectionModal(tokens) {
+    const modal = document.getElementById('tokenModal');
+    const list = document.getElementById('tokenList');
+    
+    // Sort tokens by highest liquidity first
+    tokens.sort((a, b) => b.maxLiquidity - a.maxLiquidity);
+
+    list.innerHTML = tokens.map(t => `
+        <div class="bg-gray-700/50 hover:bg-gray-700 p-3 rounded-lg cursor-pointer flex items-center justify-between border border-gray-600 transition-colors"
+             onclick="loadTokenByAddress('${t.baseToken.address}')">
+            <div class="flex items-center gap-3">
+                <div class="bg-gray-800 p-2 rounded-full w-10 h-10 flex items-center justify-center text-xs font-bold text-gray-500">
+                    ${t.chainId.substring(0,2).toUpperCase()}
+                </div>
+                <div>
+                    <div class="font-bold text-white flex items-center gap-2">
+                        ${t.baseToken.symbol}
+                        <span class="text-xs font-normal text-gray-400 bg-gray-800 px-1.5 py-0.5 rounded">${t.chainId}</span>
+                    </div>
+                    <div class="text-xs text-gray-400 truncate max-w-[150px]">${t.baseToken.name}</div>
+                </div>
+            </div>
+            <div class="text-right">
+                <div class="text-sm font-mono text-green-400">$${formatCompact(t.maxLiquidity)} Liq</div>
+                <div class="text-xs text-gray-500">Address: ${t.baseToken.address.slice(0,4)}...${t.baseToken.address.slice(-4)}</div>
+            </div>
+        </div>
+    `).join('');
+
+    modal.classList.remove('hidden');
+}
+
+// Called when user clicks a token in modal OR when only 1 token is found
+function loadTokenByAddress(address) {
+    closeModal();
+    
+    // Find all pairs that belong to this specific address
+    const pairsForThisToken = currentPairs.filter(p => p.baseToken.address === address);
+    
+    // Sort by liquidity to find the main pair (e.g. exclude low liq pairs)
+    const bestPair = pairsForThisToken.sort((a, b) => b.liquidity.usd - a.liquidity.usd)[0];
+    
+    updateUI(bestPair);
+
+    // Show dashboard
+    document.getElementById('welcomeState').classList.add('hidden');
+    document.getElementById('dashboard').classList.remove('hidden');
+    document.getElementById('errorState').classList.add('hidden');
 }
 
 function updateUI(pair) {
@@ -140,21 +236,16 @@ function updateUI(pair) {
     document.getElementById('tokenPrice').innerText = price < 0.01 ? `$${price.toFixed(8)}` : `$${price.toFixed(2)}`;
     
     // 24h Change
-    const change = pair.priceChange?.h24 || 0; // Safe access
+    const change = pair.priceChange?.h24;
     const changeEl = document.getElementById('priceChange');
     changeEl.innerText = `${change > 0 ? '+' : ''}${change.toFixed(2)}%`;
     changeEl.className = `text-sm font-medium mb-1 ${change >= 0 ? 'text-green-400' : 'text-red-400'}`;
 
-    // Liquidity & Volume (Safe access)
-    const liqUsd = pair.liquidity?.usd || 0;
-    const fdv = pair.fdv || 0;
-    const vol24 = pair.volume?.h24 || 0;
-    const txns = (pair.txns?.h24?.buys || 0) + (pair.txns?.h24?.sells || 0);
-
-    document.getElementById('tokenLiquidity').innerText = formatCurrency(liqUsd);
-    document.getElementById('tokenFdv').innerText = formatCurrency(fdv);
-    document.getElementById('tokenVolume').innerText = formatCurrency(vol24);
-    document.getElementById('txCount').innerText = txns.toLocaleString();
+    // Liquidity & Volume
+    document.getElementById('tokenLiquidity').innerText = formatCurrency(pair.liquidity.usd);
+    document.getElementById('tokenFdv').innerText = formatCurrency(pair.fdv);
+    document.getElementById('tokenVolume').innerText = formatCurrency(pair.volume.h24);
+    document.getElementById('txCount').innerText = (pair.txns.h24.buys + pair.txns.h24.sells).toLocaleString();
 
     // Pair Info Sidebar
     document.getElementById('pairDex').innerText = pair.dexId ? pair.dexId.toUpperCase() : "N/A";
@@ -164,7 +255,7 @@ function updateUI(pair) {
     document.getElementById('quoteToken').innerText = pair.quoteToken.symbol;
     document.getElementById('dexLink').href = pair.url;
 
-    // Price Changes List (Safe access)
+    // Price Changes List
     setColorAndText('change5m', pair.priceChange?.m5);
     setColorAndText('change1h', pair.priceChange?.h1);
     setColorAndText('change6h', pair.priceChange?.h6);
@@ -192,6 +283,11 @@ function formatCurrency(num) {
     if (num >= 1000000) return "$" + (num / 1000000).toFixed(2) + "M";
     if (num >= 1000) return "$" + (num / 1000).toFixed(2) + "K";
     return "$" + num.toFixed(2);
+}
+
+// Short format for Modal (e.g. 500k)
+function formatCompact(num) {
+    return new Intl.NumberFormat('en-US', { notation: "compact", maximumFractionDigits: 1 }).format(num);
 }
 
 function handleKeyPress(event) {
